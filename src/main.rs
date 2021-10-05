@@ -17,7 +17,7 @@ fn main() {
         // println!("You entered p:{} q:{}", p, q);
         if !uf.is_connected(p, q) {
             println!("{} and {} are not connected, connecting them now.", p, q);
-            uf.better_union(p, q);
+            uf.union(p, q);
         } else {
             println!("{} and {} are already connected", p, q);
         }
@@ -36,6 +36,16 @@ struct UF {
     c: Vec<usize>,
     // Not required in the lazy approach. Uncomment for standard approach
     // curr: usize,
+
+    // Contains the size of the tree for each component
+    // Instead of using distance to root as a decision for joining trees, since we find that if 4 has
+    // some children, but itself is a root, and then the user enters union(9,4) where 9 is self-contained tree
+    // then depending upon the specific order in which the user writes the query, in this case (9,4), we get
+    // 4 as a child of 9. But that's not optimal since 4 is already a root having 1 level deep children. So 
+    // to codify this extra information, just the time it takes to reach a root isn't sufficient. We also need
+    // to keep track of how large the tree is, and in case of a union, increment that root's size with the sz 
+    // of the newly added element
+    sz : Vec<usize>
 }
 // Lazy Approach
 // Change in the interpretation of the array
@@ -47,7 +57,8 @@ impl UF {
         // first difference, every index is in it's own component so it is it's own root
         // We also do not require a `curr` field here to denote components so we get rid of it
         let c = (0..n).map(|x| x).collect();
-        Self { n, c }
+        let sz = vec![0_usize; n];
+        Self { n, c , sz}
     }
     fn is_connected(&mut self, p: usize, q: usize) -> bool {
         // p and q are connected if the have the same root
@@ -66,8 +77,22 @@ impl UF {
         }
         p_val
     }
-    // Quick Union approach O(N*), depends on the find_root which is O(N)
     fn union(&mut self, p: usize, q: usize) {
+        let (p_root, q_root) = (self.find_root(p), self.find_root(q));
+        if self.sz[p] == self.sz[q] {
+            // Order doesn't matter here
+            self.c[q_root] = p_root;
+            self.sz[p] += 1;
+        } else if self.sz[p] < self.sz[q] {
+            self.c[p_root] = q_root;
+            self.sz[q] += self.sz[p];
+        } else if self.sz[p] > self.sz[q] {
+            self.c[q_root] = p_root;
+            self.sz[p] += self.sz[q];
+        } 
+    }
+    // Quick Union approach O(N*), depends on the find_root which is O(N)
+    fn crude_union(&mut self, p: usize, q: usize) {
         // Connecting p and q means setting their roots the same
         // Now our union is O(1)
         let (p_root, q_root) = (self.find_root(p), self.find_root(q));
@@ -77,28 +102,29 @@ impl UF {
     }
     // Weighted Quick Union approach: Avoiding large trees
     // The indices themselves are the components in question 0..N-1
-    fn better_union(&mut self, p: usize, q: usize) {
+    fn root_level_union(&mut self, p: usize, q: usize) {
+        // ************** Old code that doesn't calculate or store tree size ****************
         let ((p_root, p_lvl), (q_root, q_lvl)) =
             (self.find_root_level(p), self.find_root_level(q));
-        // println!(
-        //     "{q}_root = {q_root}\n{p}_root = {p_root}",
-        //     q = q,
-        //     q_root = q_root,
-        //     p = p,
-        //     p_root = p_root
-        // );
-        // println!(
-        //     "{p}_lvl = {p_lvl}\n{q}_lvl = {q_lvl}",
-        //     p = p,
-        //     p_lvl = p_lvl,
-        //     q = q,
-        //     q_lvl = q_lvl
-        // );
+        println!(
+            "{q}_root = {q_root}\n{p}_root = {p_root}",
+            q = q,
+            q_root = q_root,
+            p = p,
+            p_root = p_root
+        );
+        println!(
+            "{p}_lvl = {p_lvl}\n{q}_lvl = {q_lvl}",
+            p = p,
+            p_lvl = p_lvl,
+            q = q,
+            q_lvl = q_lvl
+        );
         if p_lvl == q_lvl {
             self.c[q_root] = p_root;
         } else if p_lvl < q_lvl {
             self.c[p_root] = q_root;
-        } else if q_lvl > p_lvl {
+        } else if p_lvl > q_lvl {
             self.c[q_root] = p_root;
         }
     }
