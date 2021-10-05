@@ -41,11 +41,11 @@ struct UF {
     // Instead of using distance to root as a decision for joining trees, since we find that if 4 has
     // some children, but itself is a root, and then the user enters union(9,4) where 9 is self-contained tree
     // then depending upon the specific order in which the user writes the query, in this case (9,4), we get
-    // 4 as a child of 9. But that's not optimal since 4 is already a root having 1 level deep children. So 
+    // 4 as a child of 9. But that's not optimal since 4 is already a root having 1 level deep children. So
     // to codify this extra information, just the time it takes to reach a root isn't sufficient. We also need
-    // to keep track of how large the tree is, and in case of a union, increment that root's size with the sz 
+    // to keep track of how large the tree is, and in case of a union, increment that root's size with the sz
     // of the newly added element
-    sz : Vec<usize>
+    sz: Vec<usize>,
 }
 // Lazy Approach
 // Change in the interpretation of the array
@@ -57,8 +57,9 @@ impl UF {
         // first difference, every index is in it's own component so it is it's own root
         // We also do not require a `curr` field here to denote components so we get rid of it
         let c = (0..n).map(|x| x).collect();
-        let sz = vec![0_usize; n];
-        Self { n, c , sz}
+        // Each tree starts out with 1 level that is the index itself
+        let sz = vec![1_usize; n];
+        Self { n, c, sz }
     }
     fn is_connected(&mut self, p: usize, q: usize) -> bool {
         // p and q are connected if the have the same root
@@ -79,17 +80,23 @@ impl UF {
     }
     fn union(&mut self, p: usize, q: usize) {
         let (p_root, q_root) = (self.find_root(p), self.find_root(q));
+        // If P and Q already have the same root no need for any further operation
+        if p_root == q_root {
+            return;
+        }
         if self.sz[p] == self.sz[q] {
             // Order doesn't matter here
             self.c[q_root] = p_root;
-            self.sz[p] += 1;
-        } else if self.sz[p] < self.sz[q] {
-            self.c[p_root] = q_root;
-            self.sz[q] += self.sz[p];
-        } else if self.sz[p] > self.sz[q] {
-            self.c[q_root] = p_root;
             self.sz[p] += self.sz[q];
         } 
+        else if self.sz[p] < self.sz[q] {
+            self.c[p_root] = q_root;
+            self.sz[q] += self.sz[p];
+        } 
+        else if self.sz[p] > self.sz[q] {
+            self.c[q_root] = p_root;
+            self.sz[p] += self.sz[q];
+        }
     }
     // Quick Union approach O(N*), depends on the find_root which is O(N)
     fn crude_union(&mut self, p: usize, q: usize) {
